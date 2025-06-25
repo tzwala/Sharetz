@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Direct Transfer (Fixed)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        :root{--primary-color:#00aaff;--success-color:#4ade80;--error-color:#f87171;--text-color:#f0f0f0;--glass-bg:rgba(255, 255, 255, 0.15);--glass-border:rgba(255, 255, 255, 0.2);--glass-shadow:rgba(0, 0, 0, 0.25);--blur-amount:12px;--border-radius:20px;}
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Poppins', sans-serif;color:var(--text-color);min-height:100vh;overflow-x:hidden;display:flex;justify-content:center;align-items:center;background:linear-gradient(135deg, #ff007f, #00c2ff, #a900ff, #00ff95);background-size:400% 400%;animation:animate-gradient 15s ease infinite;}
+        @keyframes animate-gradient{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+        .container{width:95%;max-width:800px;padding:15px;text-align:center;}
+        .glass-panel{background:var(--glass-bg);border-radius:var(--border-radius);border:1px solid var(--glass-border);box-shadow:0 8px 32px 0 var(--glass-shadow);backdrop-filter:blur(var(--blur-amount));-webkit-backdrop-filter:blur(var(--blur-amount));padding:1.5rem; transition: all 0.3s ease;}
+        h1, h2, p, button{text-shadow:0 1px 3px rgba(0,0,0,0.3);}
+        h1{margin-bottom:0.5rem;font-size: clamp(1.8rem, 5vw, 2.5rem);}
+        h2{margin-bottom:1rem;font-weight:600;padding-bottom:1rem;font-size: clamp(1.2rem, 4vw, 1.5rem);}
+        
+        /* Views */
+        #setup-view, #handshake-view, #connected-view { display: none; }
+        
+        /* Setup View */
+        .columns{display:flex;flex-direction:column;gap:2rem;margin-top:1.5rem;}
+        @media (min-width: 768px) { .columns {flex-direction: row;} }
+        .column{flex:1;padding:1.5rem;border-radius:var(--border-radius);background:rgba(0,0,0,0.1);border:1px solid var(--glass-border);}
+        
+        /* Handshake View */
+        #handshake-view h2 { border-bottom:1px solid var(--glass-border); }
+        .step { margin-bottom: 1.5rem; }
+        
+        /* Connected View */
+        .status{margin:1rem auto;padding:10px 20px;border-radius:8px;font-weight:600;display:inline-block;transition:all 0.3s ease;}
+        .status-connected{background-color:rgba(74, 222, 128, 0.5); border:1px solid rgba(74, 222, 128, 0.7);}
+        
+        /* Controls */
+        .btn{padding:15px 25px;font-size:1rem;font-weight:600;cursor:pointer;transition:all 0.2s ease;background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:12px;color:var(--text-color);width:100%;margin-top:1rem;}
+        .btn:hover:not(:disabled){background:rgba(255, 255, 255, 0.2);}
+        .btn:active:not(:disabled){transform:scale(0.97);}
+        .btn:disabled{cursor:not-allowed;opacity:0.5;}
+        .btn-primary{background:rgba(0, 170, 255, 0.5);border-color:rgba(0, 170, 255, 0.7);}
+        .btn-danger{background:rgba(248, 113, 113, 0.4);border-color:rgba(248, 113, 113, 0.6);}
+        .button-group { display: flex; gap: 1rem; }
+        textarea{width:100%;height:100px;background:rgba(0,0,0,0.2);border:1px solid var(--glass-border);border-radius:8px;color:var(--text-color);padding:10px;font-family:monospace;resize:vertical;}
+        
+        /* File Transfer Area */
+        #progress-bar{width:100%;height:10px;background-color:rgba(0,0,0,0.3);border-radius:5px;overflow:hidden;margin-top:10px;}
+        #progress-bar-fill{width:0%;height:100%;background-color:var(--success-color);transition:width 0.2s linear;}
+        #download-link{display:none;margin-top:1rem;}
+        #file-input{display:none;}
+        
+        /* Toast Notifications */
+        #toast-container{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;z-index:2000;}
+        .toast{padding:12px 20px;border-radius:12px;color:white;box-shadow:0 4px 12px rgba(0,0,0,0.3);animation:toast-in 0.5s ease, toast-out 0.5s ease 3.5s forwards;}
+        .toast.success{background-color:var(--success-color);} .toast.error{background-color:var(--error-color);} .toast.info{background-color:var(--primary-color);}
+        @keyframes toast-in{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+        @keyframes toast-out{from{opacity:1;transform:translateY(0);to{opacity:0;transform:translateY(20px);}}}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="glass-panel">
+            <h1>P2P Direct Transfer</h1>
+
+            <!-- View 1: Initial Setup -->
+            <div id="setup-view">
+                <p>A direct, secure connection between two devices.</p>
+                <div class="columns">
+                    <div class="column">
+                        <h2>Start Connection</h2>
+                        <p>Click here to start a new connection.</p>
+                        <button id="create-offer-btn" class="btn btn-primary">Create Connection</button>
+                    </div>
+                    <div class="column">
+                        <h2>Join Connection</h2>
+                        <p>Paste the code from your peer to join.</p>
+                        <textarea id="join-code-textarea" placeholder="Paste connection code here..."></textarea>
+                        <button id="join-btn" class="btn">Join with Code</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 2: Handshake (The fix is here) -->
+            <div id="handshake-view">
+                <div class="step">
+                    <h2>Step 1: Share Your Code</h2>
+                    <p>Send this code to your peer.</p>
+                    <textarea id="my-code-textarea" readonly></textarea>
+                    <div class="button-group">
+                        <button id="share-btn" class="btn btn-primary">Share</button>
+                        <button id="copy-btn" class="btn">Copy</button>
+                    </div>
+                </div>
+                <div class="step">
+                    <h2>Step 2: Receive Peer's Code</h2>
+                    <p>Paste the code you get back from them here.</p>
+                    <textarea id="peer-code-textarea" placeholder="Paste peer's code here..."></textarea>
+                    <button id="finalize-btn" class="btn">Finalize Connection</button>
+                </div>
+                <button id="start-over-btn1" class="btn btn-danger">Start Over</button>
+            </div>
+            
+            <!-- View 3: Connected -->
+            <div id="connected-view">
+                <div class="status status-connected">CONNECTED</div>
+                <h2>File Transfer Ready</h2>
+                <label for="file-input" class="btn">Select File to Send</label>
+                <input type="file" id="file-input">
+                <div id="file-info" style="margin-top: 1rem;"></div>
+                <div id="progress-bar"><div id="progress-bar-fill"></div></div>
+                <a id="download-link" class="btn btn-primary" href="#">Download Received File</a>
+                <button id="disconnect-btn" class="btn btn-danger">Disconnect & Start Over</button>
+            </div>
+
+        </div>
+    </div>
+    <div id="toast-container"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // UI Elements
+            const views = {
+                setup: document.getElementById('setup-view'),
+                handshake: document.getElementById('handshake-view'),
+                connected: document.getElementById('connected-view'),
+            };
+            const createOfferBtn = document.getElementById('create-offer-btn');
+            const joinBtn = document.getElementById('join-btn');
+            const finalizeBtn = document.getElementById('finalize-btn');
+            const joinCodeTextarea = document.getElementById('join-code-textarea');
+            const myCodeTextarea = document.getElementById('my-code-textarea');
+            const peerCodeTextarea = document.getElementById('peer-code-textarea');
+            const shareBtn = document.getElementById('share-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const startOverBtn1 = document.getElementById('start-over-btn1');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            const fileInput = document.getElementById('file-input');
+            const fileInfoEl = document.getElementById('file-info');
+            const progressBarFill = document.getElementById('progress-bar-fill');
+            const downloadLink = document.getElementById('download-link');
+            const toastContainer = document.getElementById('toast-container');
+
+            // WebRTC State
+            let peerConnection, dataChannel;
+            const iceServers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+            
+            const showToast = (message, type = 'info') => {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                toastContainer.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            };
+            
+            const updateView = (viewName) => {
+                for (const key in views) views[key].style.display = 'none';
+                views[viewName].style.display = 'block';
+            };
+
+            const resetState = () => {
+                if (peerConnection) peerConnection.close();
+                peerConnection = null;
+                dataChannel = null;
+                updateView('setup');
+                joinCodeTextarea.value = '';
+                myCodeTextarea.value = '';
+                peerCodeTextarea.value = '';
+            };
+            
+            const setupPeerConnection = () => {
+                peerConnection = new RTCPeerConnection(iceServers);
+                peerConnection.onicegatheringstatechange = () => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        myCodeTextarea.value = JSON.stringify(peerConnection.localDescription);
+                        showToast("Your code is ready to share!", "success");
+                    }
+                };
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel();
+                };
+                peerConnection.onconnectionstatechange = () => {
+                    if (peerConnection.connectionState === 'connected') {
+                        updateView('connected');
+                        showToast("Connection established!", "success");
+                    }
+                    if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
+                        showToast("Connection lost.", "error");
+                        resetState();
+                    }
+                };
+            };
+            
+            const setupDataChannel = () => {
+                dataChannel.onopen = () => updateView('connected');
+                dataChannel.onmessage = (event) => {
+                    if (typeof event.data === 'string') {
+                        const fileMetadata = JSON.parse(event.data);
+                        let receivedBuffers = [];
+                        fileInfoEl.textContent = `Receiving: ${fileMetadata.name}`;
+                        downloadLink.style.display = 'none';
+                        
+                        dataChannel.onmessage = (msg) => { // Overwrite handler for binary data
+                            receivedBuffers.push(msg.data);
+                            const receivedSize = receivedBuffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);
+                            progressBarFill.style.width = `${Math.round((receivedSize / fileMetadata.size) * 100)}%`;
+                            if (receivedSize === fileMetadata.size) {
+                                const fileBlob = new Blob(receivedBuffers);
+                                downloadLink.href = URL.createObjectURL(fileBlob);
+                                downloadLink.download = fileMetadata.name;
+                                downloadLink.style.display = 'block';
+                                fileInfoEl.textContent = `File "${fileMetadata.name}" received!`;
+                                dataChannel.onmessage = setupDataChannel().onmessage; // Reset for next file
+                            }
+                        }
+                    }
+                };
+            };
+
+            // --- Event Listeners ---
+            createOfferBtn.addEventListener('click', async () => {
+                setupPeerConnection();
+                dataChannel = peerConnection.createDataChannel('fileTransfer');
+                setupDataChannel();
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                updateView('handshake');
+                showToast("Connection created. Share your code.", "info");
+            });
+
+            joinBtn.addEventListener('click', async () => {
+                const code = joinCodeTextarea.value;
+                if (!code) return showToast('Please paste a code to join.', 'error');
+                
+                try {
+                    const offer = JSON.parse(code);
+                    setupPeerConnection();
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    updateView('handshake');
+                    showToast("Answer code generated. Send it back.", "info");
+                } catch (e) {
+                    showToast('Invalid connection code.', 'error');
+                }
+            });
+            
+            finalizeBtn.addEventListener('click', async () => {
+                const code = peerCodeTextarea.value;
+                if (!code) return showToast("Please paste your peer's code.", 'error');
+                if (!peerConnection) return showToast("Something went wrong. Please start over.", "error");
+
+                try {
+                    const answer = JSON.parse(code);
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                } catch (e) {
+                    showToast('Invalid peer code.', 'error');
+                }
+            });
+
+            shareBtn.addEventListener('click', async () => {
+                const code = myCodeTextarea.value;
+                if (!code) return showToast("No code to share yet.", "error");
+                if (navigator.share) {
+                    await navigator.share({ title: 'P2P Connection Code', text: code });
+                } else {
+                    showToast('Share API not supported. Please copy.', 'info');
+                }
+            });
+            
+            copyBtn.addEventListener('click', () => {
+                const code = myCodeTextarea.value;
+                if (!code) return showToast("No code to copy yet.", "error");
+                navigator.clipboard.writeText(code).then(() => {
+                    showToast('Copied to clipboard!', 'success');
+                });
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) sendFile(file);
+                fileInput.value = '';
+            });
+
+            const sendFile = (file) => {
+                if (!dataChannel || dataChannel.readyState !== 'open') {
+                    return showToast("Connection not ready.", "error");
+                }
+                fileInfoEl.textContent = `Sending: ${file.name}`;
+                downloadLink.style.display = 'none';
+                dataChannel.send(JSON.stringify({ name: file.name, size: file.size }));
+                
+                const fileReader = new FileReader();
+                let offset = 0;
+                fileReader.onload = e => {
+                    dataChannel.send(e.target.result);
+                    offset += e.target.result.byteLength;
+                    progressBarFill.style.width = `${Math.round((offset / file.size) * 100)}%`;
+                    if (offset < file.size) readSlice(offset);
+                    else fileInfoEl.textContent = `File "${file.name}" sent!`;
+                };
+                const readSlice = o => fileReader.readAsArrayBuffer(file.slice(offset, o + (16 * 1024)));
+                readSlice(0);
+            };
+
+            startOverBtn1.addEventListener('click', resetState);
+            disconnectBtn.addEventListener('click', resetState);
+            
+            // Initial state
+            updateView('setup');
+        });
+    </script>
+</body>
+</html>
